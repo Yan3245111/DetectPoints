@@ -105,7 +105,7 @@ def detect_spheres_from_dicom(dicom_path: str, num_spheres: int = 3, r_range: fl
                         tmp = i
                     else:
                         # 半径过滤
-                        if r_range < abs(tmp - i) < rmax * 2:
+                        if abs(tmp - i) < rmax * 2:
                             cx = ti.ceil((tmp + i) / 2.0, int)
                             xvote[cx] += 1
                             tmp = i
@@ -159,7 +159,6 @@ def detect_spheres_from_dicom(dicom_path: str, num_spheres: int = 3, r_range: fl
     #             index = ti.atomic_add(headz[None], 1)
     #             zp[index] = i
 
-    # 圆心投票和投圆心的边界值
     @ti.kernel
     def vote_R():
         for i in range(B):
@@ -224,14 +223,14 @@ def detect_spheres_from_dicom(dicom_path: str, num_spheres: int = 3, r_range: fl
                     valid_spheres.append((i, j, k))
         return valid_spheres
 
-    # 找出具有最大投票数（vote）且 vote 大于阈值的半径
     @ti.kernel
     def rpolling(valid_spheres):
+        """仅对有效的球心进行投票统计"""
         for idx in range(valid_spheres.shape[0]):
             i, j, k = valid_spheres[idx, 0], valid_spheres[idx, 1], valid_spheres[idx, 2]
             tmp = 0
             for t in range(1, rmax):
-                if rvote[i, j, k][t] >= rvote[i, j, k][tmp] and rvote[i, j, k][t] > minvote:
+                if rvote[i, j, k][t] >= rvote[i, j, k][tmp] and rvote[i, j, k][t] > 20:
                     tmp = t
             if tmp != 0:
                 index = ti.atomic_add(headrP[None], 1)
@@ -241,7 +240,6 @@ def detect_spheres_from_dicom(dicom_path: str, num_spheres: int = 3, r_range: fl
                 rpoll[index][3] = tmp
                 rpoll[index][4] = rvote[i, j, k][tmp]
 
-    # 半径过滤，距离太近的球保留得票最大的球心
     @ti.kernel
     def cirlocMax():
         for i, j in ti.ndrange(pNum, pNum):
@@ -303,8 +301,9 @@ def detect_spheres_from_dicom(dicom_path: str, num_spheres: int = 3, r_range: fl
 
 if __name__ == '__main__':
 
-    spheres = detect_spheres_from_dicom("C:/Users/YangLiangZhu/Desktop/泰州CT模型/0605脊柱实验数据/dicom_data_bad_01",
+    # 验算不出来
+    path1 = "C:/Users/YangLiangZhu/Desktop/泰州精度验证/Tai0605/1/CT-MP25075-250605-yan/S3010"
+    spheres = detect_spheres_from_dicom(path1,
                                         num_spheres=10)
     print("Detected spheres:")
     print(spheres)
-
